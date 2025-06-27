@@ -1,0 +1,122 @@
+﻿@page "/cart"
+@using ShoesStoreBlazor.Components.Service
+@using ShoesStoreBlazor.Components.Service.Classes
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3 class="mb-4" style="margin-top: 25px; margin-left: 50px;">Корзина</h3>
+
+@if (cartItems == null)
+{
+    <p style="margin-left: 50px;">Загрузка...</p>
+}
+else if (!cartItems.Any())
+{
+    <p style="margin-left: 50px;">Ваша корзина пуста.</p>
+}
+else
+{
+    <div class="container">
+        @foreach (var item in cartItems)
+        {
+            int itemIndex = cartItems.FindIndex(x => x.id == item.id);
+            ProductDto productDto = productItems[itemIndex];
+            <div class="card mb-3" style="max-width: 800px;">
+                <div class="row g-0">
+                    <div class="col-md-4">
+                        <img src="@productDto.imageUrl" class="img-fluid rounded-start" alt="@productDto.name" style="height: 150px; object-fit: cover;" />
+                    </div>
+                    <div class="col-md-8">
+                        <div class="card-body">
+                            <h5 class="card-title">@productDto.name</h5>
+                            <p class="card-text">Размер: @item.size</p>
+                            <p class="card-text">Цена: @productDto.price.ToString("C")</p>
+                            <p class="card-text">
+                                Количество: <button class="btn btn-sm btn-outline-secondary me-1"
+                                                    @onclick="() => DecreaseQuantity(item)">
+                                    −
+                                </button> @item.quantity  <button class="btn btn-sm btn-outline-secondary me-1"
+                                                                                                             @onclick="() => IncreaseQuantity(item)">
+                                    +
+                                </button>
+                            </p>
+                            <button class="btn btn-danger" @onclick="() => RemoveItem(item.id)">Удалить</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <h4>Итого: @totalCost.ToString("C")</h4>
+
+        <div class="mt-3">
+            <button class="btn btn-secondary me-2" @onclick="ClearCart">Очистить корзину</button>
+            @* <button class="btn btn-primary" @onclick="Checkout">Оформить заказ</button> *@
+        </div>
+    </div>
+}
+
+@code {
+    private List<ProductDto> productItems = new List<ProductDto>();
+    private List<CartItemDto> cartItems = new List<CartItemDto>();
+    private decimal totalCost;
+    protected override async Task OnAfterRenderAsync(bool FirstRender)
+    {
+        if (FirstRender)
+        {
+            await LoadCart();
+        }
+    }
+
+    private async Task LoadCart()
+    {
+        productItems.Clear();
+        cartItems.Clear();
+        totalCost = 0;
+        cartItems = await ApiService.GetCartAsync();
+        foreach (var item in cartItems)
+        {
+            var shoes = await ApiService.GetProductByID(item.shoesId);
+            totalCost += shoes.price * item.quantity;
+            productItems.Add(shoes);
+        }
+        foreach (var item in productItems)
+        {
+            item.imageUrl = $"http://localhost:5224{item.imageUrl}";
+        }
+        StateHasChanged();
+    }
+
+    private async Task DecreaseQuantity(CartItemDto item)
+    {
+        if (item.quantity <= 1)
+        { }
+        else
+        {
+            item.quantity -= 1;
+            await ApiService.UpdateCartItem(item);
+        }
+
+        await LoadCart();
+    }
+    private async Task IncreaseQuantity(CartItemDto item)
+    {
+        item.quantity += 1;
+        await ApiService.UpdateCartItem(item);
+        await LoadCart();
+    }
+
+
+    private async Task RemoveItem(int itemId)
+    {
+        await ApiService.RemoveFromCartAsync(itemId);
+        await LoadCart();
+    }
+
+    private async Task ClearCart()
+    {
+        await ApiService.ClearCartAsync();
+        await LoadCart();
+    }
+}

@@ -1,0 +1,57 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@using ShoesStoreBlazor.Components.Service
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IApiService _apiService
+@inject AuthenticationStateProvider AuthProvider
+@rendermode InteractiveServer
+
+<PageTitle>Вход</PageTitle>
+
+<div class="login-form">
+    <input class="input-field" placeholder="Логин" @bind="login" />
+    <input class="input-field" placeholder="Пароль" type="password" @bind="password" />
+
+    <button class="btn-login" @onclick="HandleLogin">Войти</button>
+    <button class="btn-register" @onclick="HandleRegister">Регистрация</button>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <p class="error-message">@errorMessage</p>
+    }
+</div>
+
+
+
+@code {
+    private string login;
+    private string password;
+    private string errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = "";
+
+        if (!string.IsNullOrEmpty(login) && !string.IsNullOrEmpty(password))
+        {
+            var token = await _apiService.Authorization(login, password);
+            await JS.InvokeVoidAsync("localStorage.setItem", "authToken", token);
+            if (AuthProvider is CustomAuthStateProvider custom)
+            {
+                custom.SetUserAuthenticated(login);
+            }
+            _apiService.SetToken(token);
+            Navigation.NavigateTo("/products");
+        }
+        else
+        {
+            errorMessage = "Неверный логин или пароль";
+        }
+    }
+    private async Task HandleRegister()
+    {
+        await JS.InvokeVoidAsync("alert", "Регистрация пока не реализована");
+    }
+
+}

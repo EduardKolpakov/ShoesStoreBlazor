@@ -1,0 +1,46 @@
+﻿@page "/profile"
+@using ShoesStoreBlazor.Components.Service
+@using ShoesStoreBlazor.Components.Service.Classes
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+@if (user == null)
+{
+    <p class="mt-5 ms-5">Загрузка...</p>
+}
+else
+{
+    <div class="container mt-5">
+        <div class="card p-4 shadow" style="max-width: 600px; margin: auto;">
+            <div class="d-flex align-items-center">
+                <img src="@user.userImage" alt="Avatar" class="rounded-circle me-4" style="width: 100px; height: 100px; object-fit: cover;" />
+
+                <div>
+                    <h4 class="mb-1">@user.name</h4>
+                    <p class="text-muted mb-2">@user.email</p>
+                    <p><strong>Товаров в корзине:</strong> @cartItems.Count</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@code {
+    private UserDto user;
+    private List<CartItemDto> cartItems = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            user = await ApiService.GetCurrentUserAsync();
+            cartItems = await ApiService.GetCartAsync();
+
+            // если аватар не задан — подставим заглушку
+            if (string.IsNullOrWhiteSpace(user.userImage))
+                user.userImage = "/images/avatar-placeholder.png"; // заранее положи такой файл в wwwroot/images
+            user.userImage = $"http://localhost:5224{user.userImage}";
+            StateHasChanged();
+        }
+    }
+}

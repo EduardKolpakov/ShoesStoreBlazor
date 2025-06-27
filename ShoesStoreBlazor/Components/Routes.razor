@@ -1,0 +1,40 @@
+﻿@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(Layout.MainLayout)">
+            <p>Страница не найдена</p>
+        </LayoutView>
+    </NotFound>
+</Router>
+
+@code {
+    private bool _checkedAuth = false;
+    private bool isChecking = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_checkedAuth)
+        {
+            _checkedAuth = true;
+
+            var token = await JS.InvokeAsync<string>("localStorage.getItem", "authToken");
+            var currentUri = Navigation.Uri.ToLower();
+            if (currentUri.Contains("/products") && string.IsNullOrEmpty(token))
+            {
+                Navigation.NavigateTo("/", true);
+            }
+            else
+            {
+                Navigation.NavigateTo("/products", true);
+                isChecking = false;
+                StateHasChanged();
+            }
+        }
+    }
+}

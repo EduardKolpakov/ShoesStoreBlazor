@@ -1,0 +1,239 @@
+﻿@page "/products"
+@using ShoesStoreBlazor.Components.Service
+@using ShoesStoreBlazor.Components.Service.Classes
+@inject IApiService ApiService
+@rendermode InteractiveServer
+
+<h3 class="mb-4" style="margin-top: 25px; margin-left: 50px; margin-bottom: 5px;">Товары</h3>
+
+<div class="d-flex align-items-center mb-4" style="margin-left: 50px;">
+    <label class="me-2" for="sortSelect">Сортировка:</label>
+    <select id="sortSelect" class="form-select me-4" style="width: 200px;" @bind="selectedSort">
+        <option value="default">Стандартная</option>
+        <option value="priceAsc">Цена ↑</option>
+        <option value="priceDesc">Цена ↓</option>
+        <option value="nameAsc">Название (А-Я)</option>
+    </select>
+
+    <label class="me-2" for="categorySelect">Категория:</label>
+    <select id="categorySelect" class="form-select" style="width: 200px;" @bind="selectedCategoryId">
+        <option value="0">Все категории</option>
+        @if (categories != null)
+        {
+            @foreach (var cat in categories)
+            {
+                <option value="@cat.id">@cat.name</option>
+            }
+        }
+    </select>
+</div>
+
+<div style="height: 2px; background-color: #6200ea; width: 99%; margin-bottom: 25px; margin-left:10px"></div>
+
+@if (filteredProducts == null)
+{
+    <p style="margin-left: 50px;">Загрузка...</p>
+}
+else if (filteredProducts.Count == 0)
+{
+    <p style="margin-left: 50px;">Нет товаров для отображения.</p>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-5 fw-light">
+        @foreach (var product in filteredProducts)
+        {
+            <div class="col" style="margin-left: 50px">
+                <div class="card h-100" style="width: 400px;">
+                    <img src="@product.imageUrl" class="card-img-top" alt="@product.name" style="object-fit: contain; height: 200px;" />
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">@product.name</h5>
+                        <p class="card-text">@product.price.ToString("C")</p>
+                        <div class="mt-auto d-flex justify-content-between">
+                            <button class="btn btn-primary" @onclick="() => ShowDetails(product.id)">Подробнее</button>
+                            <button class="btn btn-success" @onclick="() => ShowSizePopup(product)">В корзину</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+<!-- Модальное окно выбора размера -->
+@if (isSizePopupVisible)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Выберите размер обуви</h5>
+                    <button type="button" class="btn-close" @onclick="CloseSizePopup"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Доступные размеры: @string.Join(", ", availableSizes)</p>
+                    <input value="@selectedSize" @oninput="OnSizeInput" type="text" placeholder="Введите размер" class="form-control" maxlength="3" />
+                    @if (!string.IsNullOrEmpty(sizeError))
+                    {
+                        <div class="text-danger mt-2">@sizeError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseSizePopup">Отмена</button>
+                    <button class="btn btn-primary" @onclick="ConfirmSize" disabled="@(!IsSizeValid())">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ProductDto>? products;
+    private List<ProductDto>? filteredProducts;
+
+    private List<CategoryDto>? categories;
+    private int selectedCategoryId
+    {
+        get => _selectedCategoryId;
+        set
+        {
+            if (_selectedCategoryId != value)
+            {
+                _selectedCategoryId = value;
+                ApplyFilterAndSort();
+            }
+        }
+    }
+    private int _selectedCategoryId = 0;
+
+
+    private string selectedSort
+    {
+        get => _selectedSort;
+        set
+        {
+            if (_selectedSort != value)
+            {
+                _selectedSort = value;
+                ApplyFilterAndSort();
+            }
+        }
+    }
+    private string _selectedSort = "default";
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        categories = await ApiService.GetCategoriesAsync();
+        products = await ApiService.GetProductsAsync();
+
+        foreach (var pr in products)
+        {
+            pr.imageUrl = $"http://localhost:5224{pr.imageUrl}";
+        }
+
+        ApplyFilterAndSort();
+    }
+
+    private bool isSizePopupVisible = false;
+    private int currentProductIdForSize;
+    private string selectedSize = "";
+    private string sizeError = "";
+
+    private List<int> availableSizes = new();
+
+    private void ShowSizePopup(ProductDto product)
+    {
+        currentProductIdForSize = product.id;
+        selectedSize = "";
+        sizeError = "";
+        isSizePopupVisible = true;
+        string[] sizes = product.sizes.Split("-");
+        int minSize = int.Parse(sizes[0]);
+        int maxSize = int.Parse(sizes[1]);
+        availableSizes.Clear();
+        for (int i = minSize; i <= maxSize; i++)
+        {
+            availableSizes.Add(i);
+        }
+    }
+
+    private void CloseSizePopup()
+    {
+        isSizePopupVisible = false;
+        selectedSize = "";
+        sizeError = "";
+    }
+
+    private void OnSizeInput(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? "";
+        // Оставляем только цифры
+        selectedSize = new string(input.Where(char.IsDigit).ToArray());
+    }
+
+
+    private bool IsSizeValid()
+    {
+        if (int.TryParse(selectedSize, out int size))
+        {
+            return availableSizes.Contains(size);
+        }
+        return false;
+    }
+
+    private void ConfirmSize()
+    {
+        if (!IsSizeValid())
+        {
+            sizeError = "Введите корректный размер из списка.";
+            return;
+        }
+        CartItemRequest cartItemRequest = new CartItemRequest();
+        cartItemRequest.shoesId = currentProductIdForSize;
+        cartItemRequest.size = selectedSize;
+        cartItemRequest.quantity = 1;
+        ApiService.AddToCart(cartItemRequest);
+        Console.WriteLine($"Добавлен товар с ID: {currentProductIdForSize} с размером: {selectedSize}");
+
+        CloseSizePopup();
+    }
+
+    private void ApplyFilterAndSort()
+    {
+        if (products == null)
+        {
+            filteredProducts = null;
+            return;
+        }
+
+        IEnumerable<ProductDto> query = products;
+
+        // Фильтрация по категории
+        if (selectedCategoryId != 0)
+        {
+            query = query.Where(p => p.categoryId == selectedCategoryId);
+        }
+
+        // Сортировка
+        filteredProducts = selectedSort switch
+        {
+            "priceAsc" => query.OrderBy(p => p.price).ToList(),
+            "priceDesc" => query.OrderByDescending(p => p.price).ToList(),
+            "nameAsc" => query.OrderBy(p => p.name).ToList(),
+            _ => query.ToList()
+        };
+    }
+
+    private void ShowDetails(int id)
+    {
+        NavigationManager.NavigateTo($"/product/{id}");
+    }
+
+    private void AddToCart(int id)
+    {
+        Console.WriteLine($"Добавлен товар с ID: {id}");
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+}

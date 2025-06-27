@@ -1,0 +1,43 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using ShoesStoreBlazor.Components.Service
+@inject AuthenticationStateProvider AuthProvider
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<CascadingAuthenticationState>
+    <nav class="topnav">
+        <div class="container">
+            <div class="logo">
+                <img src="images/logosneakers.png" alt="ShoesStore" />
+            </div>
+            <div class="links">
+                <AuthorizeView>
+                    <Authorized>
+                        <NavLink href="/products">Товары</NavLink>
+                        <NavLink href="/cart">Корзина</NavLink>
+                        <NavLink href="/profile">Профиль</NavLink>
+                        <NavLink href="/" @onclick="Logout">Выход</NavLink>
+                    </Authorized>
+                    <NotAuthorized>
+                        <NavLink href="/">Вход</NavLink>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </nav>
+</CascadingAuthenticationState>
+
+@code {
+    private async Task Logout()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", "authToken");
+
+        if (AuthProvider is CustomAuthStateProvider custom)
+        {
+            custom.SetUserLoggedOut();
+        }
+
+        Navigation.NavigateTo("/");
+    }
+}

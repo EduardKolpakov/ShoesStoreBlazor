@@ -1,0 +1,121 @@
+﻿@page "/product/{ProductId:int}"
+@using ShoesStoreBlazor.Components.Service
+@using ShoesStoreBlazor.Components.Service.Classes
+@inject IApiService ApiService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+@if (product == null)
+{
+    <p style="margin: 50px;">Загрузка...</p>
+}
+else
+{
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-6">
+                <img src="@product.imageUrl" alt="@product.name" class="img-fluid" style="max-height: 400px; object-fit: cover;" />
+            </div>
+            <div class="col-md-6">
+                <h2>@product.name</h2>
+                <p class="text-muted fs-5">@product.description</p>
+                <p class="text-muted fs-5">Размеры: @product.sizes</p>
+                <h4 class="text-success mb-4">@product.price.ToString("C")</h4>
+                <button class="btn btn-success" @onclick="AddToCart">Добавить в корзину</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int ProductId { get; set; }
+    private List<int> availableSizes = new();
+    private ProductDto? product;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProduct();
+    }
+
+    private async Task LoadProduct()
+    {
+        product = await ApiService.GetProductByID(ProductId);
+        if (product != null)
+        {
+            product.imageUrl = $"http://localhost:5224{product.imageUrl}";
+        }
+    }
+
+    private async Task AddToCart()
+    {
+        selectedProductId = product!.id;
+        string[] sizes = product.sizes.Split("-");
+        int minSize = int.Parse(sizes[0]);
+        int maxSize = int.Parse(sizes[1]);
+        if (availableSizes != null)
+        {
+            availableSizes.Clear();
+        }
+        for (int i = minSize; i <= maxSize; i++)
+        {
+            availableSizes.Add(i);
+        }
+        showSizePopup = true;
+    }
+
+    private bool showSizePopup = false;
+    private string selectedSize = "";
+    private string sizeError = "";
+    private int selectedProductId;
+
+    private void ConfirmSize()
+    {
+        if (string.IsNullOrWhiteSpace(selectedSize) || !selectedSize.All(char.IsDigit))
+        {
+            sizeError = "Введите корректный размер";
+            return;
+        }
+        CartItemRequest cid = new CartItemRequest();
+        cid.shoesId = selectedProductId;
+        cid.size = selectedSize;
+        cid.quantity = 1;
+        ApiService.AddToCart(cid);
+        showSizePopup = false;
+        selectedSize = "";
+        sizeError = "";
+    }
+
+    private void ClosePopup()
+    {
+        showSizePopup = false;
+        selectedSize = "";
+        sizeError = "";
+    }
+}
+@if (showSizePopup)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Выберите размер обуви</h5>
+                    <button type="button" class="btn-close" @onclick="ClosePopup"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Доступные размеры: @string.Join(", ", availableSizes)</p>
+                    <input @bind="@selectedSize" type="text" placeholder="Введите размер" class="form-control" maxlength="3" />
+                    @if (!string.IsNullOrEmpty(sizeError))
+                    {
+                        <div class="text-danger mt-2">@sizeError</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="ClosePopup">Отмена</button>
+                    <button class="btn btn-primary" @onclick="ConfirmSize">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
